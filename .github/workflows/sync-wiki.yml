@@ -1,0 +1,32 @@
+name: Sync Documentation to Wiki
+
+on:
+  push:
+    branches: [main]
+    paths: 
+      - 'docs/**'
+      - '.github/workflows/sync-wiki.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Sync to Wiki
+        uses: spenserblack/actions-wiki@v0.3.0
+        with:
+          path: docs
+          commit-message: 'Update wiki documentation ${{ github.sha }}'
+          dry-run: false
