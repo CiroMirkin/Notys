@@ -1,6 +1,6 @@
 # Guía Completa del Backend GraphQL
 
-Esta guía explica en detalle cada archivo del backend GraphQL, sus responsabilidades y cómo interactúan entre sí.
+Esta guía explica en detalle cada archivo del backend GraphQL, sus responsabilidades y cómo interactúan entre sí. 📝
 
 ## 🏗️ Arquitectura General
 
