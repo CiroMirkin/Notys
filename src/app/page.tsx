@@ -1,19 +1,10 @@
-'use client'
-
-import { useUser } from '@auth0/nextjs-auth0/client'
-import { Card, CardHeader, CardBody, Button } from '@heroui/react'
+import { auth0 } from "@/lib/auth0";
+import { Card, CardHeader, CardBody } from '@heroui/react'
 import Profile from '@/components/Profile'
 
-export default function HomePage() {
-  const { user, isLoading } = useUser()
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
-      </div>
-    )
-  }
+export default async function HomePage() {
+   const session = await auth0.getSession();
+  const user = session?.user;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -36,31 +27,9 @@ export default function HomePage() {
                 </h2>
               </CardHeader>
               <CardBody className="text-gray-700">
-                <p className="mb-6">
-                  La aplicación de notas más segura con autenticación Auth0.
-                </p>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center w-12 h-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-300 border-t-transparent"></div>
-                  </div>
-                  <p className="text-sm text-blue-600">
-                    Iniciando servidor Auth0...
-                  </p>
-                </div>
+                <p>notas</p>
               </CardBody>
             </Card>
-            
-            <div className="mt-8">
-              <Button
-                color="primary"
-                size="lg"
-                as="a"
-                href="/auth/login"
-                className="w-full"
-              >
-                Iniciar Sesión
-              </Button>
-            </div>
           </div>
         ) : (
           <div className="max-w-6xl mx-auto">
