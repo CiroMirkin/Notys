@@ -48,10 +48,8 @@ type User {
   auth0Id: String!
   email: String!
   name: String
-  avatar: String
   notes: [Note!]!
   createdAt: String!
-  updatedAt: String!
 }
 
 type Note {
@@ -61,9 +59,10 @@ type Note {
   userId: String!
   user: User!
   createdAt: String!
-  updatedAt: String!
 }
 ```
+
+**Nota:** El schema actual no incluye campos `avatar`, `updatedAt` en User, ni `updatedAt` en Note. Estos campos existen en Prisma pero no están expuestos en GraphQL por simplicidad.
 
 ### Queries
 ```graphql
@@ -139,22 +138,43 @@ POST /api/graphql  # GraphQL mutations y queries
 
 ## Uso del Cliente Apollo
 
-### Configuración
+### Configuración Actual
 ```typescript
 // src/lib/apollo-client.ts
 import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
 
-export const apolloClient = new ApolloClient({
-  link: new HttpLink({
-    uri: '/api/graphql',
-    credentials: 'same-origin'
-  }),
-  cache: new InMemoryCache()
-});
+function createApolloClient() {
+  return new ApolloClient({
+    link: new HttpLink({
+      uri: '/api/graphql',
+      credentials: 'same-origin',
+      fetchOptions: {
+        cache: 'no-store'
+      }
+    }),
+    cache: new InMemoryCache(),
+    defaultOptions: {
+      watchQuery: {
+        fetchPolicy: 'cache-and-network'
+      }
+    }
+  });
+}
+
+export const apolloClient = createApolloClient();
 ```
 
-### Query Example
+**Archivo real:** `src/lib/apollo-client.ts`
+
+**Características implementadas:**
+- Factory Pattern para crear cliente Apollo
+- Configuración de cache `no-store` en fetch options
+- Política `cache-and-network` para queries
+- Credenciales `same-origin` para autenticación
+
+### Query Example (Implementación Real)
 ```typescript
+// src/components/notes-list.tsx
 import { gql, useQuery } from '@apollo/client';
 
 const GET_MY_NOTES = gql`
@@ -169,27 +189,105 @@ const GET_MY_NOTES = gql`
   }
 `;
 
-function MyNotesComponent() {
+export function NotesList() {
   const { data, loading, error } = useQuery(GET_MY_NOTES);
-  // Component logic...
+
+  if (loading) return <div>Cargando notas...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <div className="grid gap-4">
+      {data?.myNotes.map((note: any) => (
+        <div key={note.id} className="border rounded-lg p-4">
+          <h3 className="text-lg font-semibold">{note.title}</h3>
+          <p className="text-gray-600 mt-2">{note.content}</p>
+          <p className="text-sm text-gray-400 mt-2">
+            {new Date(note.updatedAt).toLocaleDateString()}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
 }
 ```
 
-### Mutation Example
+### Mutation Example (Implementación Real)
 ```typescript
+// src/components/note-form.tsx
+import { gql, useMutation } from '@apollo/client';
+import { useState } from 'react';
+
 const CREATE_NOTE = gql`
   mutation CreateNote($input: CreateNoteInput!) {
     createNote(input: $input) {
       id
       title
       content
+      createdAt
     }
   }
 `;
 
-function CreateNoteComponent() {
-  const [createNote, { loading }] = useMutation(CREATE_NOTE);
-  // Component logic...
+const GET_MY_NOTES = gql`
+  query GetMyNotes {
+    myNotes {
+      id
+      title
+      content
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export function NoteForm() {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  
+  const [createNote, { loading }] = useMutation(CREATE_NOTE, {
+    refetchQueries: [{ query: GET_MY_NOTES }],
+    onCompleted: () => {
+      setTitle('');
+      setContent('');
+    }
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await createNote({
+      variables: {
+        input: { title, content }
+      }
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <input
+        type="text"
+        placeholder="Título"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        className="w-full p-2 border rounded"
+        required
+      />
+      <textarea
+        placeholder="Contenido"
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        className="w-full p-2 border rounded"
+        rows={4}
+        required
+      />
+      <button
+        type="submit"
+        disabled={loading}
+        className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+      >
+        {loading ? 'Creando...' : 'Crear Nota'}
+      </button>
+    </form>
+  );
 }
 ```
 
@@ -421,11 +519,68 @@ npm run graphql:codegen
 
 ---
 
-## Next Steps (Opcional)
+---
 
-La infraestructura GraphQL está completa. Los componentes UI para notas ya están disponibles pero no integrados:
+## 🎯 Estado Actual de la Implementación
 
-- `src/components/notes-list.tsx` - Listado de notas
-- `src/components/note-form.tsx` - Formulario de creación
+### ✅ Backend GraphQL Completamente Funcional
+- **Schema**: Definido en `typeDefs.ts` con tipos User y Note
+- **Resolvers**: Implementados en `resolvers.ts` con toda la lógica CRUD
+- **Autenticación**: Integrada con Auth0 en todos los endpoints
+- **Base de Datos**: Modelo Prisma funcional con PostgreSQL
+- **API Endpoint**: `/api/graphql` operativo en desarrollo y producción
 
-Para activar la UI completa, simplemente reemplazar el contenido del dashboard con la versión que incluye estos componentes.
+### 🔄 Componentes UI Implementados pero No Integrados
+- **`note-form.tsx`**: Formulario para crear notas nuevas
+  - Utiliza `useMutation` de Apollo Client
+  - Refetch automático de notas después de creación
+  - Manejo de estados de loading
+
+- **`notes-list.tsx`**: Listado de notas del usuario
+  - Utiliza `useQuery` de Apollo Client
+  - Muestra título, contenido y fecha de actualización
+  - Manejo de estados de loading y error
+
+### ⚠️ Elementos Faltantes por Implementar
+- **Dashboard Page**: Ruta `/dashboard` referenciada en navbar pero inexistente
+- **Integración UI**: Conectar componentes de notas al dashboard
+- **Funcionalidad adicional**: Edición y eliminación de notas en la UI
+
+---
+
+## 🚀 Próximos Pasos para Completar la Integración
+
+### 1. Crear Dashboard (src/app/dashboard/page.tsx)
+```tsx
+'use client';
+
+import { NoteForm } from '@/components/note-form';
+import { NotesList } from '@/components/notes-list';
+
+export default function Dashboard() {
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Mis Notas</h1>
+      
+      <div className="grid gap-8">
+        <section>
+          <h2 className="text-xl font-semibold mb-4">Crear Nueva Nota</h2>
+          <NoteForm />
+        </section>
+        
+        <section>
+          <h2 className="text-xl font-semibold mb-4">Mis Notas</h2>
+          <NotesList />
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+### 2. Agregar Funcionalidad de Edición/Eliminación
+Extender `notes-list.tsx` con botones para editar y eliminar notas usando las mutations existentes.
+
+---
+
+La infraestructura GraphQL está completa y lista para usar. Solo falta la integración final con la UI para tener una aplicación de notas completamente funcional.
